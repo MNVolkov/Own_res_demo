@@ -1,1 +1,5 @@
 asset/
+*.elf
+*.bak
+*.o
+*.map

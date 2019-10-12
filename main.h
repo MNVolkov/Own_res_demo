@@ -24,7 +24,7 @@ struct app_data_ {
 void 	show_screen (void *return_screen);
 void 	key_press_screen();
 int 	dispatch_screen (void *param);
-void 	screen_job();
+int 	screen_job();
 void	draw_screen(int col);
-void draw_frame();
+void	draw_frame();
 #endif

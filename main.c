@@ -115,7 +115,8 @@ switch (gest->gesture){
 			// действия при свайпе вверх
 			app_data->frame++;
 			app_data->frame%=ANIMATION_FRAME_COUNT;
-			draw_frame();
+			
+			show_menu_animate(draw_frame, 0, ANIMATE_UP);
 			break;
 		};
 		case GESTURE_SWIPE_DOWN: {	// свайп вниз
@@ -126,7 +127,7 @@ switch (gest->gesture){
 				app_data->frame = ANIMATION_FRAME_COUNT-1;
 			};
 			
-			draw_frame();
+			show_menu_animate(draw_frame, 0, ANIMATE_DOWN);
 			break;
 		};		
 		default:{	// что-то пошло не так...
@@ -146,15 +147,19 @@ void draw_frame(){
 // при необходимости можно использовать данные экрана в этой функции
 struct app_data_** 	app_data_p = get_ptr_temp_buf_2(); 	//	указатель на указатель на данные экрана 
 struct app_data_ *	app_data = *app_data_p;				//	указатель на данные экрана
+
+set_bg_color(COLOR_BLACK);
+fill_screen_bg();
 	
 show_elf_res_by_id(app_data->proc->index_listed, app_data->frame+ANIMATION_FIRST_FRAME, 10, 10 );
 return;	
 }
 
-void screen_job(){
+int screen_job(){
 // при необходимости можно использовать данные экрана в этой функции
 struct app_data_** 	app_data_p = get_ptr_temp_buf_2(); 	//	указатель на указатель на данные экрана 
 struct app_data_ *	app_data = *app_data_p;				//	указатель на данные экрана
 
 show_menu_animate(app_data->ret_f, (unsigned int)show_screen, ANIMATE_RIGHT);
+return 0;
 }
