@@ -1,2 +1,2 @@
-Own res demo
-RU	Демо внутренних\nресурсов
+Own RES demo
+RU	Демо Свои ресурсы
