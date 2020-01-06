@@ -128,19 +128,19 @@ switch (gest->gesture){
 	
 			if ( get_left_side_menu_active()){
 					
+					void* show_f = get_ptr_show_menu_func();
+
 					// запускаем dispatch_left_side_menu с параметром param в результате произойдет запуск соответствующего бокового экрана
 					// при этом произойдет выгрузка данных текущего приложения и его деактивация.
-					void* show_f = get_ptr_show_menu_func();
 					dispatch_left_side_menu(param);
 										
 					if ( get_ptr_show_menu_func() == show_f ){
-						// если dispatch_left_side_menu вернет GESTURE_SWIPE_RIGHT то левее экрана нет, листать некуда
-						// просто игнорируем этот жест
-						// vibrate(1, 100, 100);
+						// если dispatch_left_side_menu() отработал безуспешно (листать некуда), то в show_menu_func по прежнему будет 
+						// содержаться наша функция show_calend_screen, тогда просто игнорируем этот жест
 						return 0;
 					}
 					
-					//	если dispatch_left_side_menu отработал, то завершаем наше приложение, т.к. данные экрана уже выгрузились
+					//	если dispatch_left_side_menu отработал успешно, то завершаем наше приложение, т.к. данные экрана уже выгрузились
 					// на этом этапе уже выполняется новый экран (тот куда свайпнули)
 					Elf_proc_* proc = get_proc_by_addr(main);
 					proc->ret_f = NULL;
