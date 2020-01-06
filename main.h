@@ -13,10 +13,16 @@
 #define ANIMATION_FIRST_FRAME	0
 #define ANIMATION_FRAME_COUNT	5
 
+// источник ресурсов
+#define RES_SRC_ELF		0
+#define RES_SRC_STOCK	1
+
+
 // структура данных для нашего экрана
 struct app_data_ {
 			void* 	ret_f;					//	адрес функции возврата
 			int		frame;					//	текущий кадр
+			int 	src;					//	источник ресурсов 0 - эльф; 1 - стоковые ресурсы
 			Elf_proc_* proc;				//	указатель на данные процесса
 };
 

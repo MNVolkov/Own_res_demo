@@ -61,7 +61,7 @@ if ( (param0 == *app_data_p) && get_var_menu_overlay()){ // возврат из 
 	app_data->proc = param0;
 	
 	// запомним адрес указателя на функцию в которую необходимо вернуться после завершения данного экрана
-	if ( param0 && app_data->proc->ret_f ) 			//	если указатель на возврат передан, то возвоащаемся на него
+	if ( param0 && app_data->proc->elf_finish ) 			//	если указатель на возврат передан, то возвоащаемся на него
 		app_data->ret_f = app_data->proc->elf_finish;
 	else					//	если нет, то на циферблат
 		app_data->ret_f = show_watchface;
@@ -70,12 +70,14 @@ if ( (param0 == *app_data_p) && get_var_menu_overlay()){ // возврат из 
 	
 	// первый кадр нулевой
 	app_data->frame = 0;
-	
+	app_data->src = RES_SRC_ELF;
 }
 
 // здесь выполняем отрисовку интерфейса, обновление (перенос в видеопамять) экрана выполнять не нужно
 draw_frame();
 
+
+// заводим таймер на 10 секунд, если никаких действияствий не было выход из приложения
 set_update_period(1, 10000);
 }
 
@@ -83,10 +85,18 @@ void key_press_screen(){
 struct app_data_** 	app_data_p = get_ptr_temp_buf_2(); 	//	указатель на указатель на данные экрана 
 struct app_data_ *	app_data = *app_data_p;				//	указатель на данные экрана
 
+
+//	если запуск был из быстрого меню, при нажатии кнопки выходим на циферблат
+if ( get_left_side_menu_active() ) 		
+    app_data->proc->ret_f = show_watchface;
+	
 // вызываем функцию возврата (обычно это меню запуска), в качестве параметра указываем адрес функции нашего приложения
 show_menu_animate(app_data->ret_f, (unsigned int)show_screen, ANIMATE_RIGHT);	
 };
 
+
+
+#define INDEX_LISTED	((app_data->src == RES_SRC_ELF)? app_data->proc->index_listed : INDEX_MAIN_RES)
 
 int dispatch_screen (void *param){
 struct app_data_** 	app_data_p = get_ptr_temp_buf_2(); 	//	указатель на указатель на данные экрана 
@@ -99,22 +109,67 @@ struct gesture_ *gest = param;
 int result = 0;
 
 switch (gest->gesture){
-	case GESTURE_CLICK: {			
+	case GESTURE_CLICK: {
+		if ( app_data->src == RES_SRC_ELF ){
+				app_data->src = RES_SRC_STOCK;
+			} else {
+				app_data->src = RES_SRC_ELF;
+			}
+
+			app_data->frame = 0;
+			
+			vibrate(1, 70, 70);
+			
+			show_menu(draw_frame, 0);		
 			break;
 		};
-		case GESTURE_SWIPE_RIGHT: {	//	свайп направо
-			// обычно это выход из приложения
-			show_menu_animate(app_data->ret_f, (unsigned int)show_screen, ANIMATE_RIGHT);	
-			break;
-		};
+		case GESTURE_SWIPE_RIGHT: 	//	свайп направо
 		case GESTURE_SWIPE_LEFT: {	// справа налево
-			// действия при свайпе влево	
+	
+			if ( get_left_side_menu_active()){
+					
+					// запускаем dispatch_left_side_menu с параметром param в результате произойдет запуск соответствующего бокового экрана
+					// при этом произойдет выгрузка данных текущего приложения и его деактивация.
+					void* show_f = get_ptr_show_menu_func();
+					dispatch_left_side_menu(param);
+										
+					if ( get_ptr_show_menu_func() == show_f ){
+						// если dispatch_left_side_menu вернет GESTURE_SWIPE_RIGHT то левее экрана нет, листать некуда
+						// просто игнорируем этот жест
+						// vibrate(1, 100, 100);
+						return 0;
+					}
+					
+					//	если dispatch_left_side_menu отработал, то завершаем наше приложение, т.к. данные экрана уже выгрузились
+					// на этом этапе уже выполняется новый экран (тот куда свайпнули)
+					Elf_proc_* proc = get_proc_by_addr(main);
+					proc->ret_f = NULL;
+					
+					elf_finish(main);	//	выгрузить Elf из памяти
+					return 0;
+				} else { 			//	если запуск не из быстрого меню, обрабатываем свайпы по отдельности
+					switch (gest->gesture){
+						case GESTURE_SWIPE_RIGHT: {	//	свайп направо
+							return show_menu_animate(app_data->ret_f, (unsigned int)main, (gest->gesture == GESTURE_SWIPE_RIGHT) ? ANIMATE_RIGHT : ANIMATE_LEFT);
+							break;
+						}
+						case GESTURE_SWIPE_LEFT: {	// справа налево
+							//	действие при запуске из меню и дальнейший свайп влево
+							
+							
+							break;
+						}
+					} /// switch (gest->gesture)
+				}
+
 			break;
-		};
+		};	//	case GESTURE_SWIPE_LEFT:
+		
+			
 		case GESTURE_SWIPE_UP: {	// свайп вверх
 			// действия при свайпе вверх
 			app_data->frame++;
-			app_data->frame%=ANIMATION_FRAME_COUNT;
+			app_data->frame%= get_res_count(INDEX_LISTED);
 			
 			show_menu_animate(draw_frame, 0, ANIMATE_UP);
 			break;
@@ -124,7 +179,7 @@ switch (gest->gesture){
 			if (app_data->frame) {
 				app_data->frame-- ;
 			} else {
-				app_data->frame = ANIMATION_FRAME_COUNT-1;
+				app_data->frame = get_res_count(INDEX_LISTED)-1;
 			};
 			
 			show_menu_animate(draw_frame, 0, ANIMATE_DOWN);
@@ -135,7 +190,7 @@ switch (gest->gesture){
 			break;
 		};		
 		
-	}
+	}	//	switch (gest->gesture)
 	
 	// продлеваем таймер бездействия
 	set_update_period(1, 10000);
@@ -148,10 +203,38 @@ void draw_frame(){
 struct app_data_** 	app_data_p = get_ptr_temp_buf_2(); 	//	указатель на указатель на данные экрана 
 struct app_data_ *	app_data = *app_data_p;				//	указатель на данные экрана
 
+struct res_params_ res_params;	//	параметры графического реурса
+char text[30];
+
 set_bg_color(COLOR_BLACK);
+set_fg_color(COLOR_WHITE);
 fill_screen_bg();
-	
-show_elf_res_by_id(app_data->proc->index_listed, app_data->frame+ANIMATION_FIRST_FRAME, 10, 10 );
+
+int result;
+result = get_res_params(INDEX_LISTED, app_data->frame, &res_params);
+if (result){
+	_sprintf(text, "%d", result);
+	text_out_center(text, 88, 5);
+};
+
+result = show_elf_res_by_id(INDEX_LISTED, app_data->frame, (176-res_params.width)/2, (176-res_params.height)/2 );
+
+if (result){
+	_sprintf(text, "%d", result);
+	text_out_center(text, 88, 25);
+}
+
+_sprintf(text, "%d", app_data->frame);
+text_out_center(text, 15, 160);
+
+_sprintf(text, "%s", (app_data->src == RES_SRC_ELF) ? "ELF":"RES");
+text_out_center(text, 160, 160);
+
+set_fg_color(COLOR_GREEN);
+_sprintf(text, "%dx%d", res_params.width, res_params.height);
+text_out_center(text, 88, 160);
+
+
 return;	
 }
 
@@ -159,6 +242,12 @@ int screen_job(){
 // при необходимости можно использовать данные экрана в этой функции
 struct app_data_** 	app_data_p = get_ptr_temp_buf_2(); 	//	указатель на указатель на данные экрана 
 struct app_data_ *	app_data = *app_data_p;				//	указатель на данные экрана
+
+vibrate(3, 100, 100);
+
+//	если запуск был из быстрого меню, выходим на циферблат
+  if ( get_left_side_menu_active() ) 		
+    app_data->proc->ret_f = show_watchface;
 
 show_menu_animate(app_data->ret_f, (unsigned int)show_screen, ANIMATE_RIGHT);
 return 0;
